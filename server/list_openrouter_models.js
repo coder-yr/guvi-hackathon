@@ -20,13 +20,10 @@ async function listModels() {
         );
 
         console.log(`\nFound ${freeModels.length} FREE models:`);
-        freeModels.forEach(m => {
-            if (m.id.includes('google')) {
-                console.log(` - ${m.id} (${m.name})`);
-            }
+        // Take top 20 to avoid spamming
+        freeModels.slice(0, 20).forEach(m => {
+            console.log(` - ${m.id}`);
         });
-
-        console.log("\n(Showing only Google models for brevity, but others exist)");
     } catch (error) {
         console.error("Error fetching models:", error.message);
     }

@@ -5,6 +5,9 @@ exports.analyzeMessage = async (req, res) => {
     try {
         const { message, sessionId } = req.body;
 
+        console.log(`\n--- Incoming Request [${sessionId || 'New Session'}] ---`);
+        console.log("Message:", message);
+
         if (!message) {
             return res.status(400).json({ error: 'Message content is required' });
         }

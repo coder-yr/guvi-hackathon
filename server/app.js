@@ -6,13 +6,20 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const morgan = require('morgan');
+
 // Middleware
+app.use(morgan('dev'));
 app.use(cors());
 app.use(bodyParser.json());
 
 // Routes
+// Routes
 const scamRoutes = require('./routes/scamRoutes');
-app.use('/api', scamRoutes);
+const authMiddleware = require('./middleware/authMiddleware');
+
+// Apply Auth Middleware to all API routes
+app.use('/api', authMiddleware, scamRoutes);
 
 // Health Check
 app.get('/', (req, res) => {

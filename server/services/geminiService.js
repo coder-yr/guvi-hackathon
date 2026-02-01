@@ -3,7 +3,7 @@ const { SCAM_DETECTION_PROMPT, HONEYPOT_PERSONA_PROMPT, INTELLIGENCE_EXTRACTION_
 require('dotenv').config();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL_NAME = "google/gemma-3-27b-it:free"; // Confirmed Free Model
+const MODEL_NAME = "google/gemini-2.5-flash"; // Latest Gemini 2.5 Flash
 
 // Mock mode fallback if key is missing
 const isMockMode = !OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'YOUR_OPENROUTER_KEY_HERE';
@@ -18,12 +18,13 @@ async function callOpenRouter(promptText) {
             model: MODEL_NAME,
             messages: [
                 { role: "user", content: promptText }
-            ]
+            ],
+            max_tokens: 500  // Explicit limit for free tier
         }, {
             headers: {
                 "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
                 "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:3000", // Required by OpenRouter
+                "HTTP-Referer": "http://localhost:3000",
                 "X-Title": "Agentic Honeypot"
             }
         });
@@ -95,3 +96,4 @@ exports.extractIntelligence = async (conversationLog) => {
         };
     }
 };
+
