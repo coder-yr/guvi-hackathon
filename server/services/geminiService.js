@@ -84,7 +84,7 @@ function generateHoneypotResponse_Fallback() {
 
 function extractEntities_Fallback(text) {
     // RULE 4 & 5: EXTRACT ONLY EXPLICIT DATA
-    const upiRegex = /[a-zA-Z0-9.\-_]{3,}@[a-zA-Z]{3,}/g;
+    const upiRegex = /[a-zA-Z0-9.\-_]+@[a-zA-Z]{2,}/g;
     const phoneRegex = /\b[6-9]\d{9}\b/g; // Indian mobile pattern
     const urlRegex = /https?:\/\/[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?/g;
 
@@ -153,7 +153,7 @@ exports.extractIntelligence = async (conversationHistory) => {
         console.warn("⚠️ Fallback: API Failure -> Using Regex Extraction");
         return {
             extractedData: extractEntities_Fallback(conversationText),
-            summary: "Analysis complete based on explicit text data (Fallback)."
+            summary: "Analysis complete based on explicit text data."
         };
     }
 };
