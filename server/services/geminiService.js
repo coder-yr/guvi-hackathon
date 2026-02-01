@@ -3,9 +3,9 @@ const { SCAM_DETECTION_PROMPT, HONEYPOT_PERSONA_PROMPT, INTELLIGENCE_EXTRACTION_
 require('dotenv').config();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL_NAME = "google/gemini-2.5-flash"; // Latest Gemini 2.5 Flash
+const MODEL_NAME = "x-ai/grok-code-fast-1"; // Free Grok model (if available)
 
-// Mock mode fallback if key is missing
+// Mock mode fallback if key is missing or invalid
 const isMockMode = !OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'YOUR_OPENROUTER_KEY_HERE';
 
 if (isMockMode) {
@@ -43,11 +43,15 @@ exports.detectScam = async (message) => {
             reasoning: "Mock analysis: Message contains typical phishing keywords."
         };
     }
+    const prompt = SCAM_DETECTION_PROMPT.replace('{message}', message);
+
     try {
-        const prompt = SCAM_DETECTION_PROMPT.replace('{message}', message);
-        const text = await callOpenRouter(prompt);
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '');
-        return JSON.parse(jsonStr);
+        const response = await callOpenRouter(prompt);
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        throw new Error("No valid JSON found in response");
     } catch (error) {
         console.warn("⚠️ Fallback: Returning Mock Data due to API failure.");
         return {
@@ -57,20 +61,23 @@ exports.detectScam = async (message) => {
     }
 };
 
-exports.generateHoneypotResponse = async (lastMessage, conversationHistory) => {
+exports.generateHoneypotResponse = async (conversationHistory, scamCategory) => {
     if (isMockMode) {
         return "Oh my, that sounds very important. How do I do that exactly? I am not very good with computers.";
     }
+    const lastMessage = conversationHistory[conversationHistory.length - 1]?.content || '';
+    const prompt = HONEYPOT_PERSONA_PROMPT.replace('{message}', lastMessage);
+
     try {
-        const prompt = HONEYPOT_PERSONA_PROMPT.replace('{message}', lastMessage);
-        return await callOpenRouter(prompt);
+        const response = await callOpenRouter(prompt);
+        return response.trim();
     } catch (error) {
         console.warn("⚠️ Fallback: Returning Mock Persona due to API failure.");
         return "Oh my, that sounds very important. How do I do that exactly? (Fallback Persona)";
     }
 };
 
-exports.extractIntelligence = async (conversationLog) => {
+exports.extractIntelligence = async (conversationHistory) => {
     if (isMockMode) {
         return {
             extractedData: {
@@ -80,11 +87,17 @@ exports.extractIntelligence = async (conversationLog) => {
             summary: "Mock Extraction: Scammer is asking for UPI transfer."
         };
     }
+    const history = Array.isArray(conversationHistory) ? conversationHistory : [];
+    const conversationText = history.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    const prompt = INTELLIGENCE_EXTRACTION_PROMPT.replace('{conversation}', conversationText);
+
     try {
-        const prompt = INTELLIGENCE_EXTRACTION_PROMPT.replace('{conversation}', conversationLog);
-        const text = await callOpenRouter(prompt);
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '');
-        return JSON.parse(jsonStr);
+        const response = await callOpenRouter(prompt);
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        throw new Error("No valid JSON found in response");
     } catch (error) {
         console.warn("⚠️ Fallback: Returning Mock Intelligence due to API failure.");
         return {
@@ -96,4 +109,3 @@ exports.extractIntelligence = async (conversationLog) => {
         };
     }
 };
-

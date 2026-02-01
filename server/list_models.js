@@ -2,12 +2,12 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 
 async function listModels() {
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("Error: GEMINI_API_KEY not found in .env");
+    if (!process.env.OPENROUTER_API_KEY) {
+        console.error("Error: OPENROUTER_API_KEY not found in .env");
         return;
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const genAI = new GoogleGenerativeAI(process.env.OPENROUTER_API_KEY);
 
     console.log("Checking available models for your API key...");
     try {
