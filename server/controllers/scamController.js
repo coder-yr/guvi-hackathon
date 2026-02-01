@@ -1,5 +1,5 @@
 const honeypotService = require('../services/honeypotService');
-const { v4: uuidv4 } = require('uuid'); // We might need to install uuid or just use rough random
+const crypto = require('crypto');
 
 exports.analyzeMessage = async (req, res) => {
     try {
@@ -12,9 +12,8 @@ exports.analyzeMessage = async (req, res) => {
             return res.status(400).json({ error: 'Message content is required' });
         }
 
-        // Generate a session ID if one isn't provided (new conversation)
-        // For hackathon simplicity, we can just use Date.now() if uuid isn't available
-        const currentSessionId = sessionId || `session_${Date.now()}`;
+        // Generate a session ID using native crypto (Node.js 18+)
+        const currentSessionId = sessionId || `session_${Date.now()}_${crypto.randomUUID()}`;
 
         const result = await honeypotService.processMessage(currentSessionId, message);
 
