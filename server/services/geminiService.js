@@ -54,6 +54,18 @@ exports.detectScam = async (message) => {
         throw new Error("No valid JSON found in response");
     } catch (error) {
         console.warn("⚠️ Fallback: Returning Mock Data due to API failure.");
+
+        // Smart Fallback: Check for safe keywords
+        const safeKeywords = ['doctor', 'appointment', 'meeting', 'reminder', 'schedule', 'class', 'school'];
+        const isLikelySafe = safeKeywords.some(word => message.toLowerCase().includes(word));
+
+        if (isLikelySafe) {
+            return {
+                isScam: false, confidenceScore: 10, category: "Legitimate (Fallback)",
+                reasoning: "Mock analysis: Message appears to be a Safe reminder or appointment."
+            };
+        }
+
         return {
             isScam: true, confidenceScore: 95, category: "Phishing (Fallback)",
             reasoning: "Mock analysis: Message contains typical phishing keywords."
