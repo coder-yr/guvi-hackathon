@@ -53,8 +53,8 @@ exports.processMessage = async (sessionId, incomingMessage) => {
 
         // Step 3: Extract Intelligence asynchronously
         // For hackathon sync response, we can do it now
-        const conversationLog = session.history.map(m => `${m.role}: ${m.content}`).join('\n');
-        const intelligence = await geminiService.extractIntelligence(conversationLog);
+        // FIX: Pass the raw history ARRAY, not a string
+        const intelligence = await geminiService.extractIntelligence(session.history);
         session.extractedIntelligence = intelligence;
 
         return {

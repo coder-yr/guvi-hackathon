@@ -146,9 +146,25 @@ exports.extractIntelligence = async (conversationHistory) => {
 
     try {
         const response = await callOpenRouter(prompt);
+        let aiResult = {};
+
         const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
-        throw new Error("No valid JSON found");
+        if (jsonMatch) {
+            aiResult = JSON.parse(jsonMatch[0]);
+        } else {
+            throw new Error("No valid JSON found in response");
+        }
+
+        // MANDATORY: Force Regex Extraction on top of AI result
+        const regexResult = extractEntities_Fallback(conversationText);
+
+        // Merge AI and Regex results (Set for uniqueness)
+        aiResult.extractedData = aiResult.extractedData || {};
+        aiResult.extractedData.upi = [...new Set([...(aiResult.extractedData.upi || []), ...regexResult.upi])];
+        aiResult.extractedData.phoneNumbers = [...new Set([...(aiResult.extractedData.phoneNumbers || []), ...regexResult.phoneNumbers])];
+        aiResult.extractedData.urls = [...new Set([...(aiResult.extractedData.urls || []), ...regexResult.urls])];
+
+        return aiResult;
     } catch (error) {
         console.warn("⚠️ Fallback: API Failure -> Using Regex Extraction");
         return {
