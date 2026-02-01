@@ -36,47 +36,88 @@ async function callOpenRouter(promptText) {
     }
 }
 
-exports.detectScam = async (message) => {
-    if (isMockMode) {
+// --- FALLBACK HELPERS ---
+
+function detectScam_Fallback(message) {
+    const msg = message.toLowerCase();
+
+    // RULE 2: OTP SAFETY OVERRIDE
+    // If it contains "OTP" or "do not share" AND NO payment/link keywords -> SAFE
+    const isOtp = msg.includes('otp') || msg.includes('do not share');
+    const hasRisk = msg.includes('pay') || msg.includes('link') || msg.includes('http') || msg.includes('money') || msg.includes('blocked') || msg.includes('verif') || msg.includes('kyc');
+
+    if (isOtp && !hasRisk) {
         return {
-            isScam: true, confidenceScore: 95, category: "Phishing",
-            reasoning: "Mock analysis: Message contains typical phishing keywords."
+            isScam: false, confidenceScore: 0.1, category: "Legitimate OTP Notification",
+            reasoning: "Message contains OTP keywords without payment requests or links."
         };
     }
+
+    // RULE 1: SCAM DETECTION
+    const scamKeywords = ['pay', 'transfer', 'blocked', 'account', 'verify', 'kyc', 'reward', 'winner', 'http', 'bit.ly', 'upi', 'credit card'];
+    const isScam = scamKeywords.some(word => msg.includes(word));
+
+    if (isScam) {
+        return {
+            isScam: true, confidenceScore: 0.95, category: "Phishing",
+            reasoning: "Message identified as high-risk (contains payment instructions, links, or urgency)."
+        };
+    }
+
+    // Default Safe (e.g. "Doctor's appointment")
+    return {
+        isScam: false, confidenceScore: 0.05, category: "Safe",
+        reasoning: "No suspicious patterns detected."
+    };
+}
+
+function generateHoneypotResponse_Fallback() {
+    // RULE 6: NO "MOCK" or "FALLBACK" WORDS
+    const responses = [
+        "Oh dear, I'm not very good with this technology. My grandson usually helps me. What exactly do I need to click?",
+        "Is this about the Google account? I tried to find the button you mentioned but my glasses are in the other room.",
+        "Hello? Who is this? You sound like a nice young man. My bank is very far away, can't I just mail a check?",
+        "Oh my, that sounds serious! I certainly don't want my account blocked. Please tell me slowly what to do, I'm writing it down."
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
+}
+
+function extractEntities_Fallback(text) {
+    // RULE 4 & 5: EXTRACT ONLY EXPLICIT DATA
+    const upiRegex = /[a-zA-Z0-9.\-_]{3,}@[a-zA-Z]{3,}/g;
+    const phoneRegex = /\b[6-9]\d{9}\b/g; // Indian mobile pattern
+    const urlRegex = /https?:\/\/[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?/g;
+
+    return {
+        upi: text.match(upiRegex) || [],
+        bankAccounts: [],
+        phoneNumbers: text.match(phoneRegex) || [],
+        urls: text.match(urlRegex) || [],
+        emails: []
+    };
+}
+
+// --- EXPORTED FUNCTIONS ---
+
+exports.detectScam = async (message) => {
+    if (isMockMode) return detectScam_Fallback(message);
+
     const prompt = SCAM_DETECTION_PROMPT.replace('{message}', message);
 
     try {
         const response = await callOpenRouter(prompt);
         const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-        throw new Error("No valid JSON found in response");
+        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        throw new Error("No valid JSON found");
     } catch (error) {
-        console.warn("⚠️ Fallback: Returning Mock Data due to API failure.");
-
-        // Smart Fallback: Check for safe keywords
-        const safeKeywords = ['doctor', 'appointment', 'meeting', 'reminder', 'schedule', 'class', 'school'];
-        const isLikelySafe = safeKeywords.some(word => message.toLowerCase().includes(word));
-
-        if (isLikelySafe) {
-            return {
-                isScam: false, confidenceScore: 10, category: "Legitimate (Fallback)",
-                reasoning: "Mock analysis: Message appears to be a Safe reminder or appointment."
-            };
-        }
-
-        return {
-            isScam: true, confidenceScore: 95, category: "Phishing (Fallback)",
-            reasoning: "Mock analysis: Message contains typical phishing keywords."
-        };
+        console.warn("⚠️ Fallback: API Failure -> Using Rule-based Detection");
+        return detectScam_Fallback(message);
     }
 };
 
 exports.generateHoneypotResponse = async (conversationHistory, scamCategory) => {
-    if (isMockMode) {
-        return "Oh my, that sounds very important. How do I do that exactly? I am not very good with computers.";
-    }
+    if (isMockMode) return generateHoneypotResponse_Fallback();
+
     const lastMessage = conversationHistory[conversationHistory.length - 1]?.content || '';
     const prompt = HONEYPOT_PERSONA_PROMPT.replace('{message}', lastMessage);
 
@@ -84,21 +125,21 @@ exports.generateHoneypotResponse = async (conversationHistory, scamCategory) => 
         const response = await callOpenRouter(prompt);
         return response.trim();
     } catch (error) {
-        console.warn("⚠️ Fallback: Returning Mock Persona due to API failure.");
-        return "Oh my, that sounds very important. How do I do that exactly? (Fallback Persona)";
+        console.warn("⚠️ Fallback: API Failure -> Using Mock Persona");
+        return generateHoneypotResponse_Fallback();
     }
 };
 
 exports.extractIntelligence = async (conversationHistory) => {
+    // Always use fallback extraction if Mock Mode to allow demo flow
     if (isMockMode) {
+        const fullText = conversationHistory.map(m => m.content).join('\n');
         return {
-            extractedData: {
-                upi: ["scammer@okicici"], bankAccounts: [], phoneNumbers: ["9876543210"],
-                urls: ["http://phishing-site.com"], emails: []
-            },
-            summary: "Mock Extraction: Scammer is asking for UPI transfer."
+            extractedData: extractEntities_Fallback(fullText),
+            summary: "Analysis complete based on explicit text data."
         };
     }
+
     const history = Array.isArray(conversationHistory) ? conversationHistory : [];
     const conversationText = history.map(msg => `${msg.role}: ${msg.content}`).join('\n');
     const prompt = INTELLIGENCE_EXTRACTION_PROMPT.replace('{conversation}', conversationText);
@@ -106,18 +147,13 @@ exports.extractIntelligence = async (conversationHistory) => {
     try {
         const response = await callOpenRouter(prompt);
         const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-        throw new Error("No valid JSON found in response");
+        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        throw new Error("No valid JSON found");
     } catch (error) {
-        console.warn("⚠️ Fallback: Returning Mock Intelligence due to API failure.");
+        console.warn("⚠️ Fallback: API Failure -> Using Regex Extraction");
         return {
-            extractedData: {
-                upi: ["scammer@okicici"], bankAccounts: [], phoneNumbers: ["9876543210"],
-                urls: ["http://phishing-site.com"], emails: []
-            },
-            summary: "Mock Extraction (Fallback): Scammer is asking for UPI transfer."
+            extractedData: extractEntities_Fallback(conversationText),
+            summary: "Analysis complete based on explicit text data (Fallback)."
         };
     }
 };
