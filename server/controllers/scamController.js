@@ -4,6 +4,7 @@ const crypto = require('crypto');
 exports.analyzeMessage = async (req, res) => {
     try {
         const { message, sessionId } = req.body;
+        const apiKey = req.headers['x-api-key'];
 
         console.log(`\n--- Incoming Request [${sessionId || 'New Session'}] ---`);
         console.log("Message:", message);
@@ -15,7 +16,7 @@ exports.analyzeMessage = async (req, res) => {
         // Generate a session ID using native crypto (Node.js 18+)
         const currentSessionId = sessionId || `session_${Date.now()}_${crypto.randomUUID()}`;
 
-        const result = await honeypotService.processMessage(currentSessionId, message);
+        const result = await honeypotService.processMessage(currentSessionId, message, apiKey);
 
         res.json({
             sessionId: currentSessionId,

@@ -12,7 +12,18 @@ if (isMockMode) {
     console.warn("WARNING: Running in MOCK MODE (OpenRouter Key missing).");
 }
 
-async function callOpenRouter(promptText) {
+async function callOpenRouter(promptText, apiKeyOverride) {
+    const apiKey = apiKeyOverride || OPENROUTER_API_KEY;
+
+    // Check if we have a valid key (either environment or override)
+    // We only fail if BOTH are missing or invalid placeholders
+    const effectiveIsMockMode = !apiKey || apiKey === 'YOUR_OPENROUTER_KEY_HERE';
+
+    if (effectiveIsMockMode) {
+        console.warn("WARNING: Mock Mode triggered in callOpenRouter (No valid key provided).");
+        throw new Error("MOCK_MODE_TRIGGER"); // internal signal to use fallback
+    }
+
     try {
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
             model: MODEL_NAME,
@@ -22,7 +33,7 @@ async function callOpenRouter(promptText) {
             max_tokens: 500  // Explicit limit for free tier
         }, {
             headers: {
-                "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                "Authorization": `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
                 "HTTP-Referer": "http://localhost:3000",
                 "X-Title": "Agentic Honeypot"
@@ -100,40 +111,43 @@ function extractEntities_Fallback(text) {
 
 // --- EXPORTED FUNCTIONS ---
 
-exports.detectScam = async (message) => {
-    if (isMockMode) return detectScam_Fallback(message);
+exports.detectScam = async (message, apiKey) => {
+    // If no key provided at all, use fallback immediately
+    if (isMockMode && !apiKey) return detectScam_Fallback(message);
 
     const prompt = SCAM_DETECTION_PROMPT.replace('{message}', message);
 
     try {
-        const response = await callOpenRouter(prompt);
+        const response = await callOpenRouter(prompt, apiKey);
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) return JSON.parse(jsonMatch[0]);
         throw new Error("No valid JSON found");
     } catch (error) {
+        if (error.message === "MOCK_MODE_TRIGGER") return detectScam_Fallback(message);
         console.warn("⚠️ Fallback: API Failure -> Using Rule-based Detection");
         return detectScam_Fallback(message);
     }
 };
 
-exports.generateHoneypotResponse = async (conversationHistory, scamCategory) => {
-    if (isMockMode) return generateHoneypotResponse_Fallback();
+exports.generateHoneypotResponse = async (conversationHistory, scamCategory, apiKey) => {
+    if (isMockMode && !apiKey) return generateHoneypotResponse_Fallback();
 
     const lastMessage = conversationHistory[conversationHistory.length - 1]?.content || '';
     const prompt = HONEYPOT_PERSONA_PROMPT.replace('{message}', lastMessage);
 
     try {
-        const response = await callOpenRouter(prompt);
+        const response = await callOpenRouter(prompt, apiKey);
         return response.trim();
     } catch (error) {
+        if (error.message === "MOCK_MODE_TRIGGER") return generateHoneypotResponse_Fallback();
         console.warn("⚠️ Fallback: API Failure -> Using Mock Persona");
         return generateHoneypotResponse_Fallback();
     }
 };
 
-exports.extractIntelligence = async (conversationHistory) => {
+exports.extractIntelligence = async (conversationHistory, apiKey) => {
     // Always use fallback extraction if Mock Mode to allow demo flow
-    if (isMockMode) {
+    if (isMockMode && !apiKey) {
         const fullText = conversationHistory.map(m => m.content).join('\n');
         return {
             extractedData: extractEntities_Fallback(fullText),
@@ -146,7 +160,7 @@ exports.extractIntelligence = async (conversationHistory) => {
     const prompt = INTELLIGENCE_EXTRACTION_PROMPT.replace('{conversation}', conversationText);
 
     try {
-        const response = await callOpenRouter(prompt);
+        const response = await callOpenRouter(prompt, apiKey);
         let aiResult = {};
 
         const jsonMatch = response.match(/\{[\s\S]*\}/);
