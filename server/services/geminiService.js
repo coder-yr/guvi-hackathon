@@ -87,10 +87,11 @@ function extractEntities_Fallback(text) {
     const upiRegex = /[a-zA-Z0-9.\-_]+@[a-zA-Z]{2,}/g;
     const phoneRegex = /\b[6-9]\d{9}\b/g; // Indian mobile pattern
     const urlRegex = /https?:\/\/[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?/g;
+    const accountRegex = /(?:paybill|account|a\/c|ac)\s*[:.-]?\s*(\d{6,20})/gi;
 
     return {
         upi: text.match(upiRegex) || [],
-        bankAccounts: [],
+        bankAccounts: [...(text.matchAll(accountRegex))].map(m => m[1]),
         phoneNumbers: text.match(phoneRegex) || [],
         urls: text.match(urlRegex) || [],
         emails: []
@@ -161,6 +162,7 @@ exports.extractIntelligence = async (conversationHistory) => {
         // Merge AI and Regex results (Set for uniqueness)
         aiResult.extractedData = aiResult.extractedData || {};
         aiResult.extractedData.upi = [...new Set([...(aiResult.extractedData.upi || []), ...regexResult.upi])];
+        aiResult.extractedData.bankAccounts = [...new Set([...(aiResult.extractedData.bankAccounts || []), ...regexResult.bankAccounts])];
         aiResult.extractedData.phoneNumbers = [...new Set([...(aiResult.extractedData.phoneNumbers || []), ...regexResult.phoneNumbers])];
         aiResult.extractedData.urls = [...new Set([...(aiResult.extractedData.urls || []), ...regexResult.urls])];
 

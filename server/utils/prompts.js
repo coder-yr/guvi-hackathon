@@ -51,7 +51,8 @@ EXTRACTION RULES:
 1. DONT HALLUCINATE. Only extract what is explicitly in the text.
 2. If no data is present, return empty arrays.
 3. UPI IDs must look like 'name@bank'.
-4. Phone numbers must be 10 digits.
+4. "Paybill" numbers or generic "Account" numbers should be put in 'bankAccounts'.
+5. Phone numbers must be 10 digits.
 
 Output in JSON format:
 {
