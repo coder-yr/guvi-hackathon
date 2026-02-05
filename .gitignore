@@ -3,3 +3,6 @@ node_modules/
 .DS_Store
 coverage/
 .vscode/
+VERCEL_FIX.md
+test_extraction.js
+simulate_scam.js
