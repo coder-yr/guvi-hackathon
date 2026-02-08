@@ -3,6 +3,17 @@ const geminiService = require('./geminiService');
 // In-memory store for active sessions (for Hackathon demo purposes)
 // Real world: Use Redis or DB
 const activeSessions = {};
+const SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 Hour
+
+// Cleanup Job: Runs every 10 minutes to remove stale sessions
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, session] of Object.entries(activeSessions)) {
+        if (now - session.lastActivity > SESSION_TIMEOUT_MS) {
+            delete activeSessions[id];
+        }
+    }
+}, 10 * 60 * 1000);
 
 exports.processMessage = async (sessionId, incomingMessage, apiKey) => {
     if (!activeSessions[sessionId]) {
@@ -10,11 +21,13 @@ exports.processMessage = async (sessionId, incomingMessage, apiKey) => {
             id: sessionId,
             history: [],
             status: 'analyzing', // analyzing, active_scam, benign
-            extractedIntelligence: {}
+            extractedIntelligence: {},
+            lastActivity: Date.now()
         };
     }
 
     const session = activeSessions[sessionId];
+    session.lastActivity = Date.now();
     session.history.push({ role: 'scammer', content: incomingMessage, timestamp: new Date() });
 
     // Step 1: Detect Scam (on every message or just the first? Let's say first for efficient demo)
@@ -48,13 +61,13 @@ exports.processMessage = async (sessionId, incomingMessage, apiKey) => {
 
     // Step 2: If Scam, Engage Honeypot
     if (session.status === 'active_scam') {
-        const response = await geminiService.generateHoneypotResponse(session.history, session.scamDetails.category, apiKey);
-        session.history.push({ role: 'honeypot', content: response, timestamp: new Date() });
+        // Optimization: Run generation and extraction in parallel
+        const [response, intelligence] = await Promise.all([
+            geminiService.generateHoneypotResponse(session.history, session.scamDetails.category, apiKey),
+            geminiService.extractIntelligence(session.history, apiKey)
+        ]);
 
-        // Step 3: Extract Intelligence asynchronously
-        // For hackathon sync response, we can do it now
-        // FIX: Pass the raw history ARRAY, not a string
-        const intelligence = await geminiService.extractIntelligence(session.history, apiKey);
+        session.history.push({ role: 'honeypot', content: response, timestamp: new Date() });
         session.extractedIntelligence = intelligence;
 
         return {
